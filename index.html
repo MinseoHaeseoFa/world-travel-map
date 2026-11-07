@@ -51,7 +51,7 @@
     <!-- 우측 도구 바 -->
     <div class="header-tools">
       <div class="search-box">
-        <input type="text" id="search-input" placeholder="국가명(한국어/영어), 수도 또는 명소 검색..." autocomplete="off">
+        <input type="text" id="search-input" placeholder="국가명(한국어/영어), 도시 또는 명소 검색..." autocomplete="off">
         <div id="search-dropdown" class="search-dropdown hidden"></div>
       </div>
       <button id="btn-random" class="tool-btn btn-random" title="미방문 국가 무작위 추천">🎲 어디 갈까?</button>
@@ -107,10 +107,10 @@
       </div>
       <div class="tooltip-info" id="tt-info">수도 · 대륙</div>
       <div class="tooltip-landmarks">
-        <strong>🌟 대표 명소 & 도시:</strong>
+        <strong>🌟 주요 도시 & 대표 명소:</strong>
         <ul id="tt-landmarks-list"></ul>
       </div>
-      <div class="tooltip-hint">클릭하여 방문 등급 및 명소 기록 👆</div>
+      <div class="tooltip-hint">클릭하여 도시별 명소 및 방문 기록 👆</div>
     </div>
   </main>
 
@@ -144,7 +144,7 @@
       <!-- 방문 등급 선택 -->
       <div class="drawer-section">
         <div class="section-title">
-          <span>🎨 방문 등급 선택</span>
+          <span>🎨 국가 방문 등급 선택</span>
           <span id="current-status-tag" class="status-tag status-none">⬜ 미방문</span>
         </div>
         <div class="status-buttons">
@@ -164,21 +164,30 @@
         <button id="btn-clear-status" class="btn-clear-status">✕ 방문 취소 (미방문으로 변경)</button>
       </div>
 
-      <!-- 대표 도시 & 랜드마크 체크리스트 -->
+      <!-- 🏙️ 주요 도시 탭/칩 선택기 (신규 2단계 드릴다운) -->
       <div class="drawer-section">
         <div class="section-title">
-          <span>🌟 대표 도시 & 명소</span>
+          <span>🏙️ 여행할 주요 도시 선택</span>
+          <span class="spots-counter" id="cities-counter">(0개 도시 방문)</span>
+        </div>
+        <div id="cities-chip-container" class="cities-chip-container"></div>
+      </div>
+
+      <!-- 📍 [선택된 도시명] 대표 명소 & 랜드마크 체크리스트 -->
+      <div class="drawer-section">
+        <div class="section-title">
+          <span>📍 <span id="current-city-name" style="color:#2563eb;">대표 도시</span> 랜드마크</span>
           <span class="spots-counter" id="spots-counter">(0/0 완료)</span>
         </div>
         <div class="spots-quick-actions">
-          <button id="btn-select-all-spots">모두 선택</button> ·
+          <button id="btn-select-all-spots">이 도시 모두 선택</button> ·
           <button id="btn-deselect-all-spots">모두 해제</button>
         </div>
         <div id="landmarks-list" class="landmarks-list"></div>
 
         <!-- 사용자 커스텀 명소 추가 -->
         <div class="custom-spot-input-wrap">
-          <input type="text" id="custom-spot-input" placeholder="내가 다녀온 나만의 도시·명소 추가...">
+          <input type="text" id="custom-spot-input" placeholder="이 도시에 나만의 명소 추가...">
           <button id="btn-add-custom-spot">+ 추가</button>
         </div>
       </div>
@@ -209,7 +218,7 @@
       </div>
       <div class="modal-body">
         <p>
-          모든 세계 여행 기록과 명소 체크리스트는 현재 브라우저에 안전하게 자동 저장되어 있습니다.<br>
+          모든 세계 여행 기록과 도시별 명소 체크리스트는 현재 브라우저에 안전하게 자동 저장되어 있습니다.<br>
           PC와 모바일 기기 간 기록을 옮기거나 안전하게 보관하시려면 JSON 파일로 백업하고 복원하실 수 있습니다.
         </p>
         <div class="modal-actions">
