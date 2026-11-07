@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>세계 여행 지도 (World Travel Map) | 나의 여행 지도</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/topojson-client@3"></script>
+</head>
+<body>
+  <!-- 상단 네비게이션 헤더 -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-area">
+        <span class="logo-icon">🌍</span>
+        <div>
+          <h1 class="logo-title">세계 여행 지도</h1>
+          <p class="logo-sub">전 세계 195개국 나의 발자국 색칠하기</p>
+        </div>
+      </div>
+
+      <!-- 상위 포털 바로가기 링크 -->
+      <a href="https://my-travel-map.vercel.app/" target="_blank" rel="noopener" class="hub-link-btn" title="나의 여행 지도 허브로 이동">
+        <span>🏠 나의 여행 지도 홈</span>
+      </a>
+    </div>
+
+    <!-- 통계 요약 바 -->
+    <div class="stats-bar">
+      <div class="stat-item main-stat">
+        <span class="stat-label">방문 국가</span>
+        <span class="stat-count"><b id="visited-count">0</b> / <span id="total-count">195</span>개국</span>
+        <span class="stat-percent" id="visit-percent">0.0%</span>
+      </div>
+      <div class="stat-progress-wrap">
+        <div class="stat-progress-bar" id="stat-progress-bar" style="width: 0%"></div>
+      </div>
+
+      <div class="level-badges">
+        <span class="level-badge badge-visited" title="방문 완료">🟢 <b id="lvl-visited">0</b></span>
+        <span class="level-badge badge-living" title="체류·거주">✈️ <b id="lvl-living">0</b></span>
+        <span class="level-badge badge-bucket" title="가고 싶은 곳 (버킷리스트)">🌟 <b id="lvl-bucket">0</b></span>
+        <span class="level-badge badge-places" title="체크한 랜드마크">📍 <b id="landmarks-count">0</b>곳</span>
+      </div>
+    </div>
+
+    <!-- 우측 도구 바 -->
+    <div class="header-tools">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="국가명(한국어/영어), 수도 또는 명소 검색..." autocomplete="off">
+        <div id="search-dropdown" class="search-dropdown hidden"></div>
+      </div>
+      <button id="btn-random" class="tool-btn btn-random" title="미방문 국가 무작위 추천">🎲 어디 갈까?</button>
+      <button id="btn-toggle-labels" class="tool-btn" title="지도 위 국가명 라벨 표시 토글">🏷️ 국명 표시</button>
+      <button id="btn-export-image" class="tool-btn" title="현재 지도 고화질 이미지로 저장">📸 지도 저장</button>
+      <button id="btn-backup-modal" class="tool-btn" title="데이터 백업 및 복원">💾 백업</button>
+    </div>
+  </header>
+
+  <!-- 대륙 필터 칩 바 -->
+  <nav class="filter-bar">
+    <div class="filter-chips">
+      <button class="chip active" data-filter="all">전체 (195)</button>
+      <button class="chip" data-filter="아시아">아시아 (48)</button>
+      <button class="chip" data-filter="유럽">유럽 (44)</button>
+      <button class="chip" data-filter="북아메리카">북아메리카 (23)</button>
+      <button class="chip" data-filter="남아메리카">남아메리카 (12)</button>
+      <button class="chip" data-filter="아프리카">아프리카 (54)</button>
+      <button class="chip" data-filter="오세아니아">오세아니아 (14)</button>
+      <button class="chip chip-visited" data-filter="visited-only">✅ 방문한 나라만</button>
+    </div>
+  </nav>
+
+  <!-- 메인 지도 캔버스 -->
+  <main class="map-viewport" id="map-viewport">
+    <svg id="world-map-svg"></svg>
+
+    <!-- 줌 컨트롤 버튼 -->
+    <div class="zoom-controls">
+      <button id="zoom-in" title="확대">+</button>
+      <button id="zoom-out" title="축소">−</button>
+      <button id="zoom-reset" title="원래대로">전체</button>
+    </div>
+
+    <!-- 범례 -->
+    <div class="map-legend">
+      <div class="legend-title">방문 등급</div>
+      <div class="legend-item"><span class="legend-color color-visited"></span> 🟢 방문 완료</div>
+      <div class="legend-item"><span class="legend-color color-living"></span> ✈️ 체류/거주</div>
+      <div class="legend-item"><span class="legend-color color-bucket"></span> 🌟 버킷리스트</div>
+      <div class="legend-item"><span class="legend-color color-unvisited"></span> ⬜ 미방문</div>
+    </div>
+
+    <!-- PC 호버 툴팁 -->
+    <div id="hover-tooltip" class="hover-tooltip hidden">
+      <div class="tooltip-header">
+        <span class="tooltip-flag" id="tt-flag">🌐</span>
+        <div>
+          <span class="tooltip-name" id="tt-name">국가명</span>
+          <span class="tooltip-en" id="tt-en">English Name</span>
+        </div>
+        <span class="tooltip-status" id="tt-status">미방문</span>
+      </div>
+      <div class="tooltip-info" id="tt-info">수도 · 대륙</div>
+      <div class="tooltip-landmarks">
+        <strong>🌟 대표 명소 & 도시:</strong>
+        <ul id="tt-landmarks-list"></ul>
+      </div>
+      <div class="tooltip-hint">클릭하여 방문 등급 및 명소 기록 👆</div>
+    </div>
+  </main>
+
+  <!-- 상세 정보 및 기록 사이드 서랍 -->
+  <aside id="detail-drawer" class="detail-drawer hidden">
+    <div class="drawer-header">
+      <div class="drawer-title-wrap">
+        <span class="drawer-flag" id="drawer-flag">🌐</span>
+        <div>
+          <div class="drawer-continent" id="drawer-continent">대륙</div>
+          <h2 class="drawer-name" id="drawer-name">국가명</h2>
+          <div class="drawer-en-name" id="drawer-en-name">Country Name</div>
+        </div>
+      </div>
+      <button id="drawer-close" class="btn-close" title="닫기">✕</button>
+    </div>
+
+    <div class="drawer-content">
+      <!-- 기본 국가 정보 -->
+      <div class="country-info-grid">
+        <div class="info-card">
+          <span class="info-label">수도</span>
+          <span class="info-val" id="drawer-capital">-</span>
+        </div>
+        <div class="info-card">
+          <span class="info-label">화폐</span>
+          <span class="info-val" id="drawer-currency">-</span>
+        </div>
+      </div>
+
+      <!-- 방문 등급 선택 -->
+      <div class="drawer-section">
+        <div class="section-title">
+          <span>🎨 방문 등급 선택</span>
+          <span id="current-status-tag" class="status-tag status-none">⬜ 미방문</span>
+        </div>
+        <div class="status-buttons">
+          <button class="status-btn" data-status="visited">
+            <span class="btn-icon">🟢</span>
+            <span class="btn-text">방문 완료</span>
+          </button>
+          <button class="status-btn" data-status="living">
+            <span class="btn-icon">✈️</span>
+            <span class="btn-text">체류·거주</span>
+          </button>
+          <button class="status-btn" data-status="bucket">
+            <span class="btn-icon">🌟</span>
+            <span class="btn-text">버킷리스트</span>
+          </button>
+        </div>
+        <button id="btn-clear-status" class="btn-clear-status">✕ 방문 취소 (미방문으로 변경)</button>
+      </div>
+
+      <!-- 대표 도시 & 랜드마크 체크리스트 -->
+      <div class="drawer-section">
+        <div class="section-title">
+          <span>🌟 대표 도시 & 명소</span>
+          <span class="spots-counter" id="spots-counter">(0/0 완료)</span>
+        </div>
+        <div class="spots-quick-actions">
+          <button id="btn-select-all-spots">모두 선택</button> ·
+          <button id="btn-deselect-all-spots">모두 해제</button>
+        </div>
+        <div id="landmarks-list" class="landmarks-list"></div>
+
+        <!-- 사용자 커스텀 명소 추가 -->
+        <div class="custom-spot-input-wrap">
+          <input type="text" id="custom-spot-input" placeholder="내가 다녀온 나만의 도시·명소 추가...">
+          <button id="btn-add-custom-spot">+ 추가</button>
+        </div>
+      </div>
+
+      <!-- 방문 일자/시기 -->
+      <div class="drawer-section">
+        <div class="section-title">📅 방문 일자 / 시기</div>
+        <input type="text" id="visit-date-input" placeholder="예: 2024년 5월, 2025.10.12 ~ 10.20">
+      </div>
+
+      <!-- 여행 메모 & 한줄평 -->
+      <div class="drawer-section">
+        <div class="section-title">📝 여행 메모 & 한줄평</div>
+        <textarea id="travel-memo" placeholder="이 나라에서 기억에 남는 추억, 맛집, 호텔, 팁을 자유롭게 기록해 보세요..."></textarea>
+        <div class="auto-save-hint">
+          <span>💾</span> 입력 내용이 브라우저에 실시간 자동 저장됩니다.
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 데이터 백업/복원 모달 -->
+  <div id="backup-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>💾 여행 데이터 백업 및 관리</h3>
+        <button id="btn-close-modal" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>
+          모든 세계 여행 기록과 명소 체크리스트는 현재 브라우저에 안전하게 자동 저장되어 있습니다.<br>
+          PC와 모바일 기기 간 기록을 옮기거나 안전하게 보관하시려면 JSON 파일로 백업하고 복원하실 수 있습니다.
+        </p>
+        <div class="modal-actions">
+          <button id="btn-download-json" class="modal-btn btn-export">
+            📥 여행 기록 JSON 파일로 내보내기 (백업)
+          </button>
+          <label class="modal-btn btn-import">
+            📤 백업 파일 불러오기 (복원)
+            <input type="file" id="json-file-input" accept=".json" style="display:none;">
+          </label>
+          <button id="btn-reset-data" class="modal-btn btn-reset">
+            🗑️ 모든 세계 여행 기록 초기화
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 데이터 파일 로드 -->
+  <script src="world-map-data.js"></script>
+  <script src="countries-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
