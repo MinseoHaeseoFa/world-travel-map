@@ -678,57 +678,101 @@ body {
   border-color: #e2e8f0;
 }
 
-/* 슬림 세그먼트 버튼 그룹 */
+/* 슬림 세그먼트 버튼 그룹 (윗줄 아이콘 + 아랫줄 텍스트 2단 구조) */
 .compact-status-group {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .status-btn-pill {
-  height: 28px;
-  padding: 0 8px;
-  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 40px;
+  padding: 3px 5px;
+  background: #ffffff;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #334155;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.status-btn-pill .btn-icon {
+  font-size: 0.85rem;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+
+.status-btn-pill .btn-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  word-break: keep-all;
+  color: #475569;
 }
 
 .status-btn-pill:hover {
-  background: #e2e8f0;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .status-btn-pill.active[data-status="visited"] {
   background: #10b981;
-  border-color: #10b981;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.status-btn-pill.active[data-status="visited"] .btn-label {
   color: #ffffff;
 }
 
 .status-btn-pill.active[data-status="living"] {
   background: #2563eb;
-  border-color: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+.status-btn-pill.active[data-status="living"] .btn-label {
   color: #ffffff;
 }
 
 .status-btn-pill.active[data-status="bucket"] {
   background: #f59e0b;
-  border-color: #f59e0b;
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+.status-btn-pill.active[data-status="bucket"] .btn-label {
   color: #ffffff;
 }
 
 .btn-clear-pill {
   color: #94a3b8;
-  font-size: 0.7rem;
+}
+
+.btn-clear-pill .btn-icon {
+  color: #94a3b8;
+  font-weight: 900;
+}
+
+.btn-clear-pill .btn-label {
+  color: #94a3b8;
 }
 
 .btn-clear-pill:hover {
   background: #fee2e2;
-  color: #b91c1c;
   border-color: #fca5a5;
+}
+
+.btn-clear-pill:hover .btn-icon,
+.btn-clear-pill:hover .btn-label {
+  color: #dc2626;
 }
 
 /* 서랍 스크롤 콘텐츠 */
