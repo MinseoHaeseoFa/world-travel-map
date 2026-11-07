@@ -1,6 +1,9 @@
 /**
- * 세계 여행 지도 (World Travel Map) v2.0
- * 전 세계 195개국 인터랙티브 방문 기록 & 주요 도시별 랜드마크 아카이브
+ * 세계 여행 지도 (World Travel Map) v2.5
+ * 전 세계 195개국 10대 대표 도시 & 10선 랜드마크 아카이브
+ * - 명소 개별 삭제(✕) 기능 탑재
+ * - 상단 수도/화폐/등급 초슬림 컴팩트 레이아웃
+ * - 맨 하단 안심 💾 [여행 기록 저장 완료] 버튼 및 토스트 알림
  */
 
 // 로컬 스토리지 키
@@ -12,11 +15,13 @@ let selectedCountryId = null;
 let activeCityName = null;
 let showLabels = true;
 let currentFilter = 'all';
+let toastTimeout = null;
 
 // DOM 요소
 const svg = d3.select('#world-map-svg');
 const tooltip = document.getElementById('hover-tooltip');
 const drawer = document.getElementById('detail-drawer');
+const toast = document.getElementById('toast-message');
 
 // SVG 크기 및 프로젝션 설정
 const width = 1200;
@@ -84,6 +89,19 @@ function saveRecords() {
   } catch (e) {
     console.error('Failed to save records to storage', e);
   }
+}
+
+/**
+ * 토스트 메시지 출력
+ */
+function showToast(message) {
+  if (toastTimeout) clearTimeout(toastTimeout);
+  document.getElementById('toast-text').textContent = message;
+  toast.classList.remove('hidden');
+
+  toastTimeout = setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 2500);
 }
 
 /**
@@ -248,11 +266,12 @@ function openCountryDrawer(countryId) {
   document.getElementById('drawer-currency').textContent = info.currency || '-';
 
   if (!travelRecords[countryId]) {
-    travelRecords[countryId] = { status: null, citySpots: {}, customCities: {}, date: '', memo: '' };
+    travelRecords[countryId] = { status: null, citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
   }
   const rec = travelRecords[countryId];
   if (!rec.citySpots) rec.citySpots = {};
   if (!rec.customCities) rec.customCities = {};
+  if (!rec.deletedSpots) rec.deletedSpots = {};
 
   // 상태 태그 및 버튼 활성화
   updateDrawerStatusUI(rec.status);
@@ -302,24 +321,24 @@ function zoomToCountry(countryId) {
 }
 
 /**
- * 서랍 내 방문 상태 UI 갱신
+ * 서랍 내 방문 상태 UI 갱신 (초슬림 알약 형태)
  */
 function updateDrawerStatusUI(status) {
   const tag = document.getElementById('current-status-tag');
-  const buttons = document.querySelectorAll('.status-btn');
+  const buttons = document.querySelectorAll('.status-btn-pill');
 
   buttons.forEach(b => b.classList.remove('active'));
 
   if (!status) {
-    tag.className = 'status-tag status-none';
+    tag.className = 'meta-pill status-pill-none';
     tag.textContent = '⬜ 미방문';
     return;
   }
 
-  const activeBtn = document.querySelector(`.status-btn[data-status="${status}"]`);
+  const activeBtn = document.querySelector(`.status-btn-pill[data-status="${status}"]`);
   if (activeBtn) activeBtn.classList.add('active');
 
-  tag.className = `status-tag status-${status}`;
+  tag.className = `meta-pill status-pill-${status}`;
   if (status === 'visited') tag.textContent = '🟢 방문 완료';
   else if (status === 'living') tag.textContent = '✈️ 체류·거주';
   else if (status === 'bucket') tag.textContent = '🌟 버킷리스트';
@@ -351,8 +370,11 @@ function renderCitiesChips(info, rec) {
   let visitedCitiesCount = 0;
 
   cityNames.forEach(cityName => {
-    const spots = allCitiesMap[cityName] || [];
-    const checkedSpots = (rec.citySpots[cityName] || []);
+    const rawSpots = allCitiesMap[cityName] || [];
+    const deletedSet = new Set(rec.deletedSpots[cityName] || []);
+    const validSpots = rawSpots.filter(s => !deletedSet.has(s));
+
+    const checkedSpots = (rec.citySpots[cityName] || []).filter(s => !deletedSet.has(s));
     const isVisited = checkedSpots.length > 0;
     if (isVisited) visitedCitiesCount++;
 
@@ -360,13 +382,13 @@ function renderCitiesChips(info, rec) {
     chip.className = `city-chip ${cityName === activeCityName ? 'active' : ''}`;
     chip.innerHTML = `
       <span>${cityName}</span>
-      <span class="city-chip-count">${checkedSpots.length}/${spots.length}</span>
+      <span class="city-chip-count">${checkedSpots.length}/${validSpots.length}</span>
     `;
 
     chip.addEventListener('click', () => {
       activeCityName = cityName;
       renderCitiesChips(info, rec);
-      renderLandmarksForCity(cityName, allCitiesMap[cityName], rec);
+      renderLandmarksForCity(cityName, validSpots, rec);
     });
 
     container.appendChild(chip);
@@ -395,18 +417,28 @@ function renderCitiesChips(info, rec) {
   document.getElementById('cities-counter').textContent = `(${visitedCitiesCount}/${cityNames.length}개 도시 방문)`;
 
   // 현재 활성 도시의 랜드마크 렌더링
-  renderLandmarksForCity(activeCityName, allCitiesMap[activeCityName] || [], rec);
+  const rawActiveSpots = allCitiesMap[activeCityName] || [];
+  const deletedActiveSet = new Set(rec.deletedSpots[activeCityName] || []);
+  const validActiveSpots = rawActiveSpots.filter(s => !deletedActiveSet.has(s));
+
+  renderLandmarksForCity(activeCityName, validActiveSpots, rec);
 }
 
 /**
- * 📍 선택된 도시의 랜드마크 체크리스트 렌더링
+ * 📍 선택된 도시의 랜드마크 체크리스트 렌더링 (삭제 기능 포함)
  */
 function renderLandmarksForCity(cityName, spots, rec) {
   document.getElementById('current-city-name').textContent = cityName;
   const container = document.getElementById('landmarks-list');
   container.innerHTML = '';
 
-  const checkedSpots = new Set(rec.citySpots[cityName] || []);
+  const checkedSpots = new Set((rec.citySpots[cityName] || []));
+
+  if (!spots.length) {
+    container.innerHTML = '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:0.78rem;">등록된 랜드마크가 없습니다. 아래에서 명소를 추가하거나 상단 [명소 초기화]를 눌러보세요.</div>';
+    updateSpotsCounter(0, 0);
+    return;
+  }
 
   spots.forEach(spotName => {
     const item = document.createElement('div');
@@ -426,6 +458,10 @@ function renderLandmarksForCity(cityName, spots, rec) {
     left.appendChild(checkbox);
     left.appendChild(span);
 
+    // 우측 액션 그룹 (지도 + 삭제 ✕)
+    const rightActions = document.createElement('div');
+    rightActions.className = 'spot-right-actions';
+
     // 구글 지도 검색 링크
     const countryName = COUNTRIES_DATA[selectedCountryId].name;
     const mapLink = document.createElement('a');
@@ -437,8 +473,21 @@ function renderLandmarksForCity(cityName, spots, rec) {
     mapLink.title = '구글 지도에서 위치 확인';
     mapLink.onclick = (e) => e.stopPropagation();
 
+    // [개선 3] 랜드마크 개별 삭제 버튼
+    const delBtn = document.createElement('button');
+    delBtn.className = 'spot-del-btn';
+    delBtn.textContent = '✕';
+    delBtn.title = '이 랜드마크 목록에서 삭제';
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      deleteSpot(cityName, spotName);
+    };
+
+    rightActions.appendChild(mapLink);
+    rightActions.appendChild(delBtn);
+
     item.appendChild(left);
-    item.appendChild(mapLink);
+    item.appendChild(rightActions);
 
     item.addEventListener('click', () => {
       checkbox.checked = !checkbox.checked;
@@ -453,7 +502,37 @@ function renderLandmarksForCity(cityName, spots, rec) {
     container.appendChild(item);
   });
 
-  updateSpotsCounter(checkedSpots.size, spots.length);
+  const validCheckedCount = spots.filter(s => checkedSpots.has(s)).length;
+  updateSpotsCounter(validCheckedCount, spots.length);
+}
+
+/**
+ * 랜드마크 개별 삭제 처리
+ */
+function deleteSpot(cityName, spotName) {
+  if (!selectedCountryId) return;
+  const rec = travelRecords[selectedCountryId];
+  if (!rec) return;
+
+  // 1. 체크된 목록에서 제거
+  if (rec.citySpots[cityName]) {
+    rec.citySpots[cityName] = rec.citySpots[cityName].filter(s => s !== spotName);
+  }
+
+  // 2. 커스텀 명소라면 커스텀 배열에서 제거
+  if (rec.customCities && rec.customCities[cityName]) {
+    rec.customCities[cityName] = rec.customCities[cityName].filter(s => s !== spotName);
+  }
+
+  // 3. 기본 명소라면 deletedSpots에 추가
+  if (!rec.deletedSpots) rec.deletedSpots = {};
+  if (!rec.deletedSpots[cityName]) rec.deletedSpots[cityName] = [];
+  if (!rec.deletedSpots[cityName].includes(spotName)) {
+    rec.deletedSpots[cityName].push(spotName);
+  }
+
+  saveRecords();
+  renderCitiesChips(COUNTRIES_DATA[selectedCountryId], rec);
 }
 
 /**
@@ -506,8 +585,10 @@ function updateStats() {
     else if (rec.status === 'bucket') bucketCount++;
 
     if (rec.citySpots) {
-      Object.values(rec.citySpots).forEach(spots => {
-        totalLandmarks += spots.length;
+      Object.entries(rec.citySpots).forEach(([cName, spots]) => {
+        const deletedSet = new Set((rec.deletedSpots && rec.deletedSpots[cName]) || []);
+        const validSpots = spots.filter(s => !deletedSet.has(s));
+        totalLandmarks += validSpots.length;
       });
     }
   });
@@ -533,14 +614,14 @@ function initUI() {
   // 1. 서랍 닫기 버튼
   document.getElementById('drawer-close').addEventListener('click', closeDrawer);
 
-  // 2. 방문 등급 버튼 클릭
-  document.querySelectorAll('.status-btn').forEach(btn => {
+  // 2. 방문 등급 콤팩트 버튼 클릭
+  document.querySelectorAll('.status-btn-pill[data-status]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (!selectedCountryId) return;
       const status = btn.getAttribute('data-status');
 
       if (!travelRecords[selectedCountryId]) {
-        travelRecords[selectedCountryId] = { status: null, citySpots: {}, customCities: {}, date: '', memo: '' };
+        travelRecords[selectedCountryId] = { status: null, citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
       }
 
       travelRecords[selectedCountryId].status = status;
@@ -559,17 +640,19 @@ function initUI() {
     }
   });
 
-  // 4. 활성 도시 명소 모두 선택 / 모두 해제
+  // 4. 활성 도시 명소 모두 선택 / 모두 해제 / 기본 명소 초기화
   document.getElementById('btn-select-all-spots').addEventListener('click', () => {
     if (!selectedCountryId || !activeCityName) return;
     const info = COUNTRIES_DATA[selectedCountryId];
     const rec = travelRecords[selectedCountryId];
 
     const allCitiesMap = { ...(info.cities || {}), ...(rec.customCities || {}) };
-    const spots = allCitiesMap[activeCityName] || [];
+    const rawSpots = allCitiesMap[activeCityName] || [];
+    const deletedSet = new Set(rec.deletedSpots[activeCityName] || []);
+    const validSpots = rawSpots.filter(s => !deletedSet.has(s));
 
     if (!rec.citySpots) rec.citySpots = {};
-    rec.citySpots[activeCityName] = [...spots];
+    rec.citySpots[activeCityName] = [...validSpots];
 
     if (!rec.status) {
       rec.status = 'visited';
@@ -590,6 +673,17 @@ function initUI() {
     }
   });
 
+  document.getElementById('btn-reset-default-spots').addEventListener('click', () => {
+    if (!selectedCountryId || !activeCityName) return;
+    const rec = travelRecords[selectedCountryId];
+    if (rec.deletedSpots && rec.deletedSpots[activeCityName]) {
+      delete rec.deletedSpots[activeCityName];
+      saveRecords();
+      renderCitiesChips(COUNTRIES_DATA[selectedCountryId], rec);
+      showToast(`[${activeCityName}] 기본 랜드마크가 복원되었습니다! 🔄`);
+    }
+  });
+
   // 5. 활성 도시에 나만의 명소 추가
   document.getElementById('btn-add-custom-spot').addEventListener('click', addCustomSpot);
   document.getElementById('custom-spot-input').addEventListener('keypress', (e) => {
@@ -607,7 +701,7 @@ function initUI() {
 
     if (!rec.customCities) rec.customCities = {};
     if (!rec.customCities[activeCityName]) {
-      rec.customCities[activeCityName] = [...(info.cities[activeCityName] || [])];
+      rec.customCities[activeCityName] = [];
     }
 
     if (!rec.customCities[activeCityName].includes(val)) {
@@ -624,7 +718,7 @@ function initUI() {
   document.getElementById('visit-date-input').addEventListener('input', (e) => {
     if (!selectedCountryId) return;
     if (!travelRecords[selectedCountryId]) {
-      travelRecords[selectedCountryId] = { status: 'visited', citySpots: {}, customCities: {}, date: '', memo: '' };
+      travelRecords[selectedCountryId] = { status: 'visited', citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
     }
     travelRecords[selectedCountryId].date = e.target.value;
     saveRecords();
@@ -633,10 +727,40 @@ function initUI() {
   document.getElementById('travel-memo').addEventListener('input', (e) => {
     if (!selectedCountryId) return;
     if (!travelRecords[selectedCountryId]) {
-      travelRecords[selectedCountryId] = { status: 'visited', citySpots: {}, customCities: {}, date: '', memo: '' };
+      travelRecords[selectedCountryId] = { status: 'visited', citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
     }
     travelRecords[selectedCountryId].memo = e.target.value;
     saveRecords();
+  });
+
+  // [개선 5] 맨 하단 안심 💾 [여행 기록 저장 완료] 버튼
+  const saveBtn = document.getElementById('btn-save-confirm');
+  saveBtn.addEventListener('click', () => {
+    if (!selectedCountryId) return;
+    const info = COUNTRIES_DATA[selectedCountryId];
+    const countryName = info ? info.name : '해당 국가';
+
+    // 현재 텍스트 값 최종 확인 및 저장
+    if (!travelRecords[selectedCountryId]) {
+      travelRecords[selectedCountryId] = { status: 'visited', citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
+    }
+    travelRecords[selectedCountryId].date = document.getElementById('visit-date-input').value;
+    travelRecords[selectedCountryId].memo = document.getElementById('travel-memo').value;
+
+    saveRecords();
+
+    // 버튼 피드백 애니메이션
+    saveBtn.classList.add('saved-success');
+    const originalHtml = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<span class="save-icon">✓</span><span class="save-text">저장 완료!</span>';
+
+    setTimeout(() => {
+      saveBtn.classList.remove('saved-success');
+      saveBtn.innerHTML = originalHtml;
+    }, 1500);
+
+    // 안심 토스트 출력
+    showToast(`✅ [${countryName}] 여행 기록이 안전하게 저장되었습니다! 💾`);
   });
 
   // 7. 검색 기능 (국가명, 영문명, 수도, 도시, 명소 모두 실시간 검색)
@@ -665,7 +789,6 @@ function initUI() {
         score = 7;
         matchType = `수도: ${info.capital}`;
       } else {
-        // 도시 검색
         const cities = info.cities || {};
         for (const [cName, spots] of Object.entries(cities)) {
           if (cName.toLowerCase().includes(q)) {
@@ -838,7 +961,7 @@ function initUI() {
     }
   });
 
-  // 13. 📸 고화질 지도 이미지 내보내기 (PNG)
+  // 13. 📸 고화질 PNG 지도 다운로드
   document.getElementById('btn-export-image').addEventListener('click', exportMapAsImage);
 }
 

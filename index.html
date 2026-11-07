@@ -24,7 +24,7 @@
       </div>
 
       <!-- 상위 포털 바로가기 링크 -->
-      <a href="https://my-travel-map.vercel.app/" target="_blank" rel="noopener" class="hub-link-btn" title="나의 여행 지도 허브로 이동">
+      <a href="https://my-travel-map-kohl.vercel.app/" target="_blank" rel="noopener" class="hub-link-btn" title="나의 여행 지도 허브로 이동">
         <span>🏠 나의 여행 지도 홈</span>
       </a>
     </div>
@@ -116,6 +116,7 @@
 
   <!-- 상세 정보 및 기록 사이드 서랍 -->
   <aside id="detail-drawer" class="detail-drawer hidden">
+    <!-- 서랍 헤더 -->
     <div class="drawer-header">
       <div class="drawer-title-wrap">
         <span class="drawer-flag" id="drawer-flag">🌐</span>
@@ -128,43 +129,23 @@
       <button id="drawer-close" class="btn-close" title="닫기">✕</button>
     </div>
 
+    <!-- [개선 1] 초슬림 컴팩트 상단 메타 바 (수도, 화폐, 방문등급 한 줄 압축) -->
+    <div class="compact-meta-bar">
+      <div class="compact-info-chips">
+        <span class="meta-pill">🏛️ <span id="drawer-capital">-</span></span>
+        <span class="meta-pill">💰 <span id="drawer-currency">-</span></span>
+        <span id="current-status-tag" class="meta-pill status-pill-none">⬜ 미방문</span>
+      </div>
+      <div class="compact-status-group">
+        <button class="status-btn-pill" data-status="visited" title="방문 완료로 설정">🟢 방문</button>
+        <button class="status-btn-pill" data-status="living" title="체류·거주로 설정">✈️ 체류</button>
+        <button class="status-btn-pill" data-status="bucket" title="가고 싶은 곳으로 설정">🌟 버킷</button>
+        <button class="status-btn-pill btn-clear-pill" id="btn-clear-status" title="미방문으로 취소">✕ 취소</button>
+      </div>
+    </div>
+
     <div class="drawer-content">
-      <!-- 기본 국가 정보 -->
-      <div class="country-info-grid">
-        <div class="info-card">
-          <span class="info-label">수도</span>
-          <span class="info-val" id="drawer-capital">-</span>
-        </div>
-        <div class="info-card">
-          <span class="info-label">화폐</span>
-          <span class="info-val" id="drawer-currency">-</span>
-        </div>
-      </div>
-
-      <!-- 방문 등급 선택 -->
-      <div class="drawer-section">
-        <div class="section-title">
-          <span>🎨 국가 방문 등급 선택</span>
-          <span id="current-status-tag" class="status-tag status-none">⬜ 미방문</span>
-        </div>
-        <div class="status-buttons">
-          <button class="status-btn" data-status="visited">
-            <span class="btn-icon">🟢</span>
-            <span class="btn-text">방문 완료</span>
-          </button>
-          <button class="status-btn" data-status="living">
-            <span class="btn-icon">✈️</span>
-            <span class="btn-text">체류·거주</span>
-          </button>
-          <button class="status-btn" data-status="bucket">
-            <span class="btn-icon">🌟</span>
-            <span class="btn-text">버킷리스트</span>
-          </button>
-        </div>
-        <button id="btn-clear-status" class="btn-clear-status">✕ 방문 취소 (미방문으로 변경)</button>
-      </div>
-
-      <!-- 🏙️ 주요 도시 탭/칩 선택기 (신규 2단계 드릴다운) -->
+      <!-- 🏙️ 주요 도시 탭/칩 선택기 (10개 도시) -->
       <div class="drawer-section">
         <div class="section-title">
           <span>🏙️ 여행할 주요 도시 선택</span>
@@ -173,15 +154,16 @@
         <div id="cities-chip-container" class="cities-chip-container"></div>
       </div>
 
-      <!-- 📍 [선택된 도시명] 대표 명소 & 랜드마크 체크리스트 -->
+      <!-- 📍 [선택된 도시명] 대표 명소 & 랜드마크 체크리스트 (10개 명소 + 삭제 기능) -->
       <div class="drawer-section">
         <div class="section-title">
-          <span>📍 <span id="current-city-name" style="color:#2563eb;">대표 도시</span> 랜드마크</span>
+          <span>📍 <span id="current-city-name" style="color:#2563eb;">대표 도시</span> 랜드마크 10선</span>
           <span class="spots-counter" id="spots-counter">(0/0 완료)</span>
         </div>
         <div class="spots-quick-actions">
           <button id="btn-select-all-spots">이 도시 모두 선택</button> ·
-          <button id="btn-deselect-all-spots">모두 해제</button>
+          <button id="btn-deselect-all-spots">모두 해제</button> ·
+          <button id="btn-reset-default-spots" title="삭제한 기본 명소 복원">명소 초기화</button>
         </div>
         <div id="landmarks-list" class="landmarks-list"></div>
 
@@ -202,12 +184,23 @@
       <div class="drawer-section">
         <div class="section-title">📝 여행 메모 & 한줄평</div>
         <textarea id="travel-memo" placeholder="이 나라에서 기억에 남는 추억, 맛집, 호텔, 팁을 자유롭게 기록해 보세요..."></textarea>
-        <div class="auto-save-hint">
-          <span>💾</span> 입력 내용이 브라우저에 실시간 자동 저장됩니다.
-        </div>
       </div>
     </div>
+
+    <!-- [개선 2] 맨 하단 안심 💾 [여행 기록 저장 완료] 버튼 영역 -->
+    <div class="drawer-bottom-sticky">
+      <button id="btn-save-confirm" class="btn-save-confirm">
+        <span class="save-icon">💾</span>
+        <span class="save-text">여행 기록 저장 완료</span>
+      </button>
+    </div>
   </aside>
+
+  <!-- 저장 완료 토스트 알림 -->
+  <div id="toast-message" class="toast-message hidden">
+    <span class="toast-icon">✅</span>
+    <span id="toast-text">여행 기록이 안전하게 저장되었습니다!</span>
+  </div>
 
   <!-- 데이터 백업/복원 모달 -->
   <div id="backup-modal" class="modal-overlay hidden">
