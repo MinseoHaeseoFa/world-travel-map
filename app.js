@@ -61,6 +61,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap();
   initUI();
   updateStats();
+  // 자동 시트 연동: 로컬 기록이 비어있으면 시트에서 자동 로드
+  if (Object.keys(travelRecords).length === 0) {
+    syncWorldPullFromSheet(false);
+  }
 });
 
 /**
@@ -961,6 +965,24 @@ function initUI() {
     }
   });
 
+  // 구글 시트 동기화 버튼 연동
+  const btnHeaderSync = document.getElementById('btn-header-sync');
+  if (btnHeaderSync) {
+    btnHeaderSync.addEventListener('click', () => {
+      backupModal.classList.remove('hidden');
+    });
+  }
+
+  const btnSyncPull = document.getElementById('btn-sync-pull');
+  if (btnSyncPull) {
+    btnSyncPull.addEventListener('click', () => syncWorldPullFromSheet(true));
+  }
+
+  const btnSyncPush = document.getElementById('btn-sync-push');
+  if (btnSyncPush) {
+    btnSyncPush.addEventListener('click', () => syncWorldPushToSheet());
+  }
+
   // 13. 📸 고화질 PNG 지도 다운로드
   document.getElementById('btn-export-image').addEventListener('click', exportMapAsImage);
 }
@@ -1002,4 +1024,101 @@ function exportMapAsImage() {
   };
 
   img.src = url;
+}
+
+// --- Google Sheet Real-time Sync for World Map ---
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqiTEoPG98sJbNy8mP2hRlojmmgb_lGp7mb43KtBIepgVGO1QWee2i9FJ14n2yQYVz/exec';
+
+async function syncWorldPullFromSheet(showFeedback = true) {
+  const statusEl = document.getElementById('sync-status');
+  if (statusEl && showFeedback) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#2563eb';
+    statusEl.textContent = '⏳ 구글 시트에서 최신 세계 여행 기록을 불러오는 중...';
+  }
+  try {
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=world`);
+    const json = await res.json();
+    if (json && json.world) {
+      const incoming = json.world;
+      const count = Object.keys(incoming).length;
+      if (count === 0) {
+        if (statusEl && showFeedback) {
+          statusEl.style.display = 'block';
+          statusEl.style.color = '#64748b';
+          statusEl.textContent = 'ℹ️ 구글 시트에 아직 저장된 방문 기록이 없습니다.';
+        }
+        return;
+      }
+      Object.keys(incoming).forEach(code => {
+        const item = incoming[code];
+        travelRecords[code] = {
+          status: item.status || 'visited',
+          visitedDate: item.visitedDate || '',
+          visitedCities: Array.isArray(item.visitedCities) ? item.visitedCities : [],
+          memo: item.memo || ''
+        };
+      });
+      saveRecords();
+      if (statusEl && showFeedback) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#059669';
+        statusEl.textContent = `✅ 구글 시트에서 ${count}개국 기록을 성공적으로 불러왔습니다!`;
+      }
+    }
+  } catch (err) {
+    console.error('World sync pull failed:', err);
+    if (statusEl && showFeedback) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#dc2626';
+      statusEl.textContent = '❌ 동기화 실패: 네트워크 상태를 확인해 주세요.';
+    }
+  }
+}
+
+async function syncWorldPushToSheet() {
+  const statusEl = document.getElementById('sync-status');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#2563eb';
+    statusEl.textContent = '⏳ 구글 시트로 현재 세계 여행 기록을 저장하는 중...';
+  }
+  try {
+    const count = Object.keys(travelRecords).length;
+    const dataToSend = {};
+    Object.keys(travelRecords).forEach(code => {
+      const r = travelRecords[code];
+      dataToSend[code] = {
+        status: r.status || '미방문',
+        visitedDate: r.visitedDate || '',
+        visitedCities: r.visitedCities || [],
+        memo: r.memo || ''
+      };
+    });
+    const payload = {
+      type: 'world',
+      data: dataToSend
+    };
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json && json.status === 'ok') {
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#059669';
+        statusEl.textContent = `✅ 구글 시트에 ${count}개국 기록을 저장했습니다! (PC·모바일 동기화 완료)`;
+      }
+    } else {
+      throw new Error((json && json.message) || '저장 실패');
+    }
+  } catch (err) {
+    console.error('World sync push failed:', err);
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#dc2626';
+      statusEl.textContent = '❌ 저장 실패: 잠시 후 다시 시도해 주세요.';
+    }
+  }
 }
