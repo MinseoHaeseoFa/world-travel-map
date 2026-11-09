@@ -1052,14 +1052,19 @@ async function syncWorldPullFromSheet(showFeedback = true) {
       }
       Object.keys(incoming).forEach(code => {
         const item = incoming[code];
-        travelRecords[code] = {
-          status: item.status || 'visited',
-          visitedDate: item.visitedDate || '',
-          visitedCities: Array.isArray(item.visitedCities) ? item.visitedCities : [],
-          memo: item.memo || ''
-        };
+        if (!travelRecords[code]) {
+          travelRecords[code] = { status: null, citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
+        }
+        const rec = travelRecords[code];
+        rec.status = item.status || null;
+        rec.date = item.date || item.visitedDate || '';
+        rec.customCities = item.customCities || {};
+        rec.citySpots = item.citySpots || {};
+        rec.memo = item.memo || '';
       });
       saveRecords();
+      updateMapColors();
+      updateStats();
       if (statusEl && showFeedback) {
         statusEl.style.display = 'block';
         statusEl.style.color = '#059669';
@@ -1090,8 +1095,9 @@ async function syncWorldPushToSheet() {
       const r = travelRecords[code];
       dataToSend[code] = {
         status: r.status || '미방문',
-        visitedDate: r.visitedDate || '',
-        visitedCities: r.visitedCities || [],
+        date: r.date || r.visitedDate || '',
+        customCities: r.customCities || {},
+        citySpots: r.citySpots || {},
         memo: r.memo || ''
       };
     });
