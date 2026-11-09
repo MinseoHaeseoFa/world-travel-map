@@ -1014,10 +1014,10 @@ function exportMapAsImage() {
     // 하단 워터마크 추가
     ctx.font = 'bold 22px Pretendard, sans-serif';
     ctx.fillStyle = '#1e3a8a';
-    ctx.fillText('나의 세계 여행 지도 (World Travel Map)', 40, canvas.height - 40);
+    ctx.fillText('나의 세계 여행 Trail Log', 40, canvas.height - 40);
 
     const a = document.createElement('a');
-    a.download = `my-world-travel-map-${new Date().toISOString().slice(0,10)}.png`;
+    a.download = `나의_세계_여행_Trail_Log_${new Date().toISOString().slice(0,10)}.png`;
     a.href = canvas.toDataURL('image/png');
     a.click();
     URL.revokeObjectURL(url);
