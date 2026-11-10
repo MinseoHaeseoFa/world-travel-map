@@ -1027,7 +1027,7 @@ function exportMapAsImage() {
 }
 
 // --- Google Sheet Real-time Sync for World Map ---
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqiTEoPG98sJbNy8mP2hRlojmmgb_lGp7mb43KtBIepgVGO1QWee2i9FJ14n2yQYVz/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwylu_1JxOFwI66iI3X0Fc7IQz7PiA5zJKjrjZkvNF1XzPKVzmvLZSHnB-bilwVdawE/exec';
 
 async function syncWorldPullFromSheet(showFeedback = true) {
   const statusEl = document.getElementById('sync-status');
