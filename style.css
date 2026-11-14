@@ -1267,6 +1267,11 @@ body {
 
   .tool-btn {
     flex-shrink: 0;
+    padding: 7px 11px;
+  }
+
+  .tool-btn .btn-text {
+    display: none;
   }
 
   .filter-bar {
