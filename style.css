@@ -30,13 +30,20 @@
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
 }
 
+html, body {
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+  overflow-x: hidden;
+}
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-main);
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* 상단 헤더 */
@@ -553,22 +560,25 @@ body {
 
 /* 사이드 상세 서랍 */
 .detail-drawer {
-  position: absolute;
+  position: fixed;
   top: 0;
   right: 0;
   width: 420px;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   background: var(--bg-drawer);
   border-left: 1px solid var(--border-color);
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.08);
-  z-index: 150;
+  z-index: 200;
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s;
 }
 
 .detail-drawer.hidden {
   transform: translateX(100%);
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .drawer-header {
@@ -1181,9 +1191,27 @@ body {
 /* 모바일 반응형 */
 @media (max-width: 900px) {
   .app-header {
+    width: 100%;
+    max-width: 100%;
     height: auto;
-    padding: 10px 14px;
+    padding: 8px 12px;
+    gap: 8px;
     flex-wrap: wrap;
+  }
+
+  .header-left {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .logo-title {
+    font-size: 1rem;
+  }
+
+  .logo-sub {
+    display: none;
   }
 
   .stats-bar {
@@ -1192,11 +1220,51 @@ body {
     justify-content: space-between;
   }
 
-  .detail-drawer {
+  .header-tools {
+    order: 2;
     width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .search-box {
     width: 150px;
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  .tool-btn {
+    flex-shrink: 0;
+  }
+
+  .filter-bar {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 12px;
+  }
+
+  .map-viewport {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .zoom-controls {
+    left: 12px;
+    bottom: 16px;
+  }
+
+  .map-legend {
+    right: 12px;
+    bottom: 16px;
+  }
+
+  .detail-drawer {
+    width: 100%;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
   }
 }
