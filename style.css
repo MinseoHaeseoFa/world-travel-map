@@ -48,15 +48,18 @@ body {
 
 /* 상단 헤더 */
 .app-header {
-  height: 64px;
+  min-height: 64px;
+  height: auto;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  gap: 16px;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  column-gap: 16px;
+  padding: 10px 20px;
   z-index: 100;
   flex-shrink: 0;
 }
@@ -83,11 +86,13 @@ body {
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #1e3a8a;
+  white-space: nowrap;
 }
 
 .logo-sub {
   font-size: 0.72rem;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .hub-link-btn {
@@ -103,6 +108,7 @@ body {
   font-weight: 600;
   text-decoration: none;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .hub-link-btn:hover {
@@ -121,6 +127,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--border-color);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .stat-item {
@@ -128,17 +135,20 @@ body {
   align-items: baseline;
   gap: 6px;
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .stat-label {
   color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .stat-count {
   font-weight: 700;
   color: #0f172a;
+  white-space: nowrap;
 }
 
 .stat-percent {
@@ -146,6 +156,7 @@ body {
   font-weight: 800;
   font-size: 0.85rem;
   margin-left: 2px;
+  white-space: nowrap;
 }
 
 .stat-progress-wrap {
@@ -178,6 +189,7 @@ body {
   border-radius: 6px;
   border: 1px solid var(--border-color);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .level-badge b {
@@ -1186,6 +1198,23 @@ body {
   background: #fee2e2;
   border-color: #fca5a5;
   color: #991b1b;
+}
+
+/* 데스크톱/노트북 2단 깔끔 정렬 */
+@media (max-width: 1580px) and (min-width: 901px) {
+  .stats-bar {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .header-tools {
+    flex-shrink: 0;
+  }
+
+  .search-box {
+    width: 180px;
+  }
 }
 
 /* 모바일 반응형 */
