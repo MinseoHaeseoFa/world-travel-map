@@ -1035,7 +1035,7 @@ async function syncWorldPullFromSheet(showFeedback = true) {
     statusEl.textContent = '⏳ 구글 시트에서 최신 세계 여행 기록을 불러오는 중...';
   }
   try {
-    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=world`);
+    const res = await fetch(`${GOOGLE_SCRIPT_URL}?action=world&_t=${Date.now()}`, { cache: 'no-store' });
     const json = await res.json();
     if (json && json.world) {
       const incoming = json.world;
@@ -1048,6 +1048,8 @@ async function syncWorldPullFromSheet(showFeedback = true) {
         }
         return;
       }
+      // 구글 시트를 단일 기준(SSOT)으로 삼아 기존 로컬 캐시 잔여 기록 완전 교체
+      travelRecords = {};
       Object.keys(incoming).forEach(code => {
         const item = incoming[code];
         if (!travelRecords[code]) {
