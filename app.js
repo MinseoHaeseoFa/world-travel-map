@@ -204,6 +204,9 @@ function handleMouseEnter(event, d) {
   document.getElementById('tt-status').textContent = statusText;
   document.getElementById('tt-info').textContent = `수도: ${info.capital || '-'} · ${info.continent || '-'}`;
 
+  // 대표 이미지가 등록된 국가는 "국가명 / 등급 + 사진"만 깔끔하게 표시
+  updateTooltipPhoto(rec && rec.imageUrl);
+
   const landmarksUl = document.getElementById('tt-landmarks-list');
   landmarksUl.innerHTML = '';
 
@@ -232,14 +235,42 @@ function handleMouseEnter(event, d) {
 
 function handleMouseMove(event) {
   const viewport = document.getElementById('map-viewport').getBoundingClientRect();
+  const ttW = tooltip.offsetWidth || 250;
+  const ttH = tooltip.offsetHeight || 200;
+
   const x = event.clientX - viewport.left + 15;
   const y = event.clientY - viewport.top + 15;
 
-  const maxW = viewport.width - 270;
-  const maxH = viewport.height - 220;
+  const maxW = Math.max(8, viewport.width - ttW - 8);
+  const maxH = Math.max(8, viewport.height - ttH - 8);
 
-  tooltip.style.left = `${Math.min(x, maxW)}px`;
-  tooltip.style.top = `${Math.min(y, maxH)}px`;
+  tooltip.style.left = `${Math.max(8, Math.min(x, maxW))}px`;
+  tooltip.style.top = `${Math.max(8, Math.min(y, maxH))}px`;
+}
+
+// 호버 팝업 대표 이미지: 마우스를 올린 순간에만 1장 로드 (온디맨드 지연 로딩)
+function updateTooltipPhoto(imageUrl) {
+  const wrap = document.getElementById('tt-photo-wrap');
+  const img = document.getElementById('tt-photo');
+  if (!wrap || !img) return;
+
+  const url = (typeof imageUrl === 'string') ? imageUrl.trim() : '';
+  if (url) {
+    if (img.getAttribute('data-src') !== url) {
+      img.setAttribute('data-src', url);
+      img.src = url;
+    }
+    img.onerror = () => {
+      wrap.style.display = 'none';
+      tooltip.classList.remove('has-photo');
+    };
+    wrap.style.display = 'block';
+    tooltip.classList.add('has-photo');
+  } else {
+    wrap.style.display = 'none';
+    tooltip.classList.remove('has-photo');
+    img.removeAttribute('data-src');
+  }
 }
 
 function handleMouseLeave() {
@@ -284,6 +315,8 @@ function openCountryDrawer(countryId) {
   // 날짜 & 메모
   document.getElementById('visit-date-input').value = rec.date || '';
   document.getElementById('travel-memo').value = rec.memo || '';
+
+  renderPhotoCard(rec.imageUrl || '');
 
   drawer.classList.remove('hidden');
 
@@ -615,6 +648,9 @@ function updateStats() {
 function initUI() {
   // 1. 서랍 닫기 버튼
   document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+
+  // 1-1. 대표 이미지 (Trail Log Photos)
+  setupPhotoCard();
 
   // 2. 방문 등급 콤팩트 버튼 클릭
   document.querySelectorAll('.status-btn-pill[data-status]').forEach(btn => {
@@ -1061,6 +1097,7 @@ async function syncWorldPullFromSheet(showFeedback = true) {
         rec.customCities = item.customCities || {};
         rec.citySpots = item.citySpots || {};
         rec.memo = item.memo || '';
+        rec.imageUrl = item.imageUrl || '';
       });
       saveRecords();
       updateMapColors();
@@ -1093,13 +1130,18 @@ async function syncWorldPushToSheet() {
     const dataToSend = {};
     Object.keys(travelRecords).forEach(code => {
       const r = travelRecords[code];
-      dataToSend[code] = {
+      const item = {
         status: r.status || '미방문',
         date: r.date || r.visitedDate || '',
         customCities: r.customCities || {},
         citySpots: r.citySpots || {},
         memo: r.memo || ''
       };
+      // imageUrl 값을 알고 있는 경우에만 전송 (모르는 상태에서 사진을 지우지 않도록)
+      if (Object.prototype.hasOwnProperty.call(r, 'imageUrl')) {
+        item.imageUrl = r.imageUrl || '';
+      }
+      dataToSend[code] = item;
     });
     const payload = {
       type: 'world',
@@ -1126,5 +1168,266 @@ async function syncWorldPushToSheet() {
       statusEl.style.color = '#dc2626';
       statusEl.textContent = '❌ 저장 실패: 잠시 후 다시 시도해 주세요.';
     }
+  }
+}
+
+/* ==========================================================================
+   대표 이미지 (Trail Log Photos)
+   브라우저에서 600px·30~50KB로 자동 압축 → Google Drive 저장 → 시트 ImageUrl 동기화
+   ========================================================================== */
+const PHOTO_SCOPE = 'world';
+const PHOTO_FOLDER_NAME = 'Trail Log Photos';
+const PHOTO_EMPTY_TEXT = '이 나라의 기억을 사진 한 장으로 남겨 보세요';
+const PHOTO_MAX_WIDTH = 600;
+const PHOTO_TARGET_BYTES = 50 * 1024;
+const PHOTO_REDEPLOY_MSG = '구글 시트 Apps Script를 v3 새 버전으로 재배포하면 사진이 저장됩니다';
+
+let photoBusy = false;
+let photoStatusTimer = null;
+let webpSupport = null;
+
+function supportsWebp() {
+  if (webpSupport !== null) return webpSupport;
+  try {
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = 1;
+    webpSupport = c.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+  } catch (e) {
+    webpSupport = false;
+  }
+  return webpSupport;
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(new Error('파일을 읽지 못했습니다.'));
+    fr.readAsDataURL(file);
+  });
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('이미지를 열지 못했습니다. 다른 사진으로 시도해 주세요.'));
+    img.src = src;
+  });
+}
+
+function estimateDataUrlBytes(dataUrl) {
+  const comma = dataUrl.indexOf(',');
+  const b64 = comma > -1 ? dataUrl.substring(comma + 1) : dataUrl;
+  const padding = b64.endsWith('==') ? 2 : (b64.endsWith('=') ? 1 : 0);
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
+
+async function compressTrailPhoto(file) {
+  if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+    throw new Error('사진 파일(이미지)만 등록할 수 있습니다.');
+  }
+  const dataUrl = await readFileAsDataURL(file);
+  const img = await loadImageElement(dataUrl);
+  const srcW = img.naturalWidth || img.width;
+  const srcH = img.naturalHeight || img.height;
+  if (!srcW || !srcH) throw new Error('이미지 크기를 읽을 수 없습니다.');
+
+  const mime = supportsWebp() ? 'image/webp' : 'image/jpeg';
+  let width = Math.min(PHOTO_MAX_WIDTH, srcW);
+  let quality = 0.82;
+  let out = '';
+
+  for (let i = 0; i < 8; i++) {
+    const height = Math.max(1, Math.round((srcH * width) / srcW));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width));
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    out = canvas.toDataURL(mime, quality);
+
+    if (estimateDataUrlBytes(out) <= PHOTO_TARGET_BYTES) break;
+    if (quality > 0.6) {
+      quality = Math.max(0.6, quality - 0.06);
+    } else {
+      width = width * 0.85;
+      quality = 0.78;
+    }
+  }
+
+  const bytes = estimateDataUrlBytes(out);
+  const base64 = out.substring(out.indexOf(',') + 1);
+  const ext = mime === 'image/webp' ? 'webp' : 'jpg';
+  return {
+    base64: base64,
+    mimeType: mime,
+    bytes: bytes,
+    fileName: `traillog-world-${Date.now()}.${ext}`
+  };
+}
+
+function setPhotoStatus(message, kind) {
+  const el = document.getElementById('photo-status');
+  if (!el) return;
+  if (photoStatusTimer) clearTimeout(photoStatusTimer);
+  el.className = 'photo-status' + (message ? ' show' : '');
+  if (kind === 'ok') el.classList.add('ok');
+  if (kind === 'error') el.classList.add('error');
+  el.textContent = message || '';
+  if (message) {
+    photoStatusTimer = setTimeout(() => {
+      el.className = 'photo-status';
+      el.textContent = '';
+    }, 8000);
+  }
+}
+
+function renderPhotoCard(imageUrl) {
+  const frame = document.getElementById('photo-frame');
+  const img = document.getElementById('photo-img');
+  const empty = document.getElementById('photo-empty');
+  const btnUpload = document.getElementById('btn-photo-upload');
+  const btnDelete = document.getElementById('btn-photo-delete');
+  if (!frame || !img) return;
+
+  const url = (typeof imageUrl === 'string') ? imageUrl.trim() : '';
+  const emptyText = empty ? empty.querySelector('.photo-empty-text') : null;
+  if (url) {
+    if (emptyText) emptyText.textContent = PHOTO_EMPTY_TEXT;
+    img.onerror = () => {
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      empty.style.display = 'flex';
+      frame.classList.remove('has-photo');
+      if (emptyText) emptyText.textContent = '사진을 불러오지 못했습니다. [🔄 사진 변경]으로 다시 등록해 주세요.';
+    };
+    img.src = url;
+    img.style.display = 'block';
+    empty.style.display = 'none';
+    frame.classList.add('has-photo');
+    btnUpload.textContent = '🔄 사진 변경';
+    btnDelete.classList.remove('hidden');
+  } else {
+    img.onerror = null;
+    img.removeAttribute('src');
+    img.style.display = 'none';
+    empty.style.display = 'flex';
+    frame.classList.remove('has-photo');
+    btnUpload.textContent = '📷 대표 사진 등록';
+    btnDelete.classList.add('hidden');
+  }
+}
+
+function setPhotoButtonsDisabled(disabled) {
+  const btnUpload = document.getElementById('btn-photo-upload');
+  const btnDelete = document.getElementById('btn-photo-delete');
+  if (btnUpload) btnUpload.disabled = disabled;
+  if (btnDelete) btnDelete.disabled = disabled;
+}
+
+async function handlePhotoFileSelected(file) {
+  const code = selectedCountryId;
+  if (!code || photoBusy) return;
+
+  photoBusy = true;
+  setPhotoButtonsDisabled(true);
+  setPhotoStatus('⏳ 사진을 가로 600px로 압축해 구글 드라이브에 저장하는 중...', '');
+
+  try {
+    const compressed = await compressTrailPhoto(file);
+    const payload = {
+      action: 'uploadPhoto',
+      folderName: PHOTO_FOLDER_NAME,
+      fileName: compressed.fileName,
+      mimeType: compressed.mimeType,
+      base64Data: compressed.base64,
+      scope: PHOTO_SCOPE,
+      key: String(code)
+    };
+
+    const res = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    let json = null;
+    try {
+      json = await res.json();
+    } catch (parseErr) {
+      json = null;
+    }
+
+    if (!json || json.status !== 'ok' || !json.imageUrl) {
+      throw new Error(PHOTO_REDEPLOY_MSG);
+    }
+
+    if (!travelRecords[code]) {
+      travelRecords[code] = { status: null, citySpots: {}, customCities: {}, deletedSpots: {}, date: '', memo: '' };
+    }
+    travelRecords[code].imageUrl = json.imageUrl;
+    saveRecords();
+    renderPhotoCard(json.imageUrl);
+    setPhotoStatus(`✅ 대표 사진 저장 완료 (${Math.round(compressed.bytes / 1024)}KB · 구글 드라이브 'Trail Log Photos')`, 'ok');
+  } catch (err) {
+    setPhotoStatus('⚠️ ' + (err && err.message ? err.message : '사진 저장에 실패했습니다.'), 'error');
+  } finally {
+    photoBusy = false;
+    setPhotoButtonsDisabled(false);
+  }
+}
+
+async function handlePhotoDelete() {
+  const code = selectedCountryId;
+  if (!code || photoBusy) return;
+  if (!window.confirm('이 나라의 대표 사진을 삭제할까요? (드라이브 원본은 보관됩니다)')) return;
+
+  photoBusy = true;
+  setPhotoButtonsDisabled(true);
+  setPhotoStatus('⏳ 대표 사진을 삭제하는 중...', '');
+
+  try {
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'deletePhoto', scope: PHOTO_SCOPE, key: String(code) })
+    });
+  } catch (err) {
+    console.warn('Photo delete request failed:', err);
+  }
+
+  if (travelRecords[code]) {
+    travelRecords[code].imageUrl = '';
+  }
+  saveRecords();
+  renderPhotoCard('');
+  setPhotoStatus('🗑️ 대표 사진을 삭제했습니다. (드라이브 원본은 Trail Log Photos 폴더에 보관)', 'ok');
+
+  photoBusy = false;
+  setPhotoButtonsDisabled(false);
+}
+
+function setupPhotoCard() {
+  const btnUpload = document.getElementById('btn-photo-upload');
+  const btnDelete = document.getElementById('btn-photo-delete');
+  const fileInput = document.getElementById('photo-file-input');
+  if (!btnUpload || !fileInput) return;
+
+  btnUpload.addEventListener('click', () => {
+    if (!selectedCountryId || photoBusy) return;
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) handlePhotoFileSelected(file);
+  });
+
+  if (btnDelete) {
+    btnDelete.addEventListener('click', handlePhotoDelete);
   }
 }
