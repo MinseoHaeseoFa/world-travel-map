@@ -1064,7 +1064,7 @@ function exportMapAsImage() {
 }
 
 // --- Google Sheet Real-time Sync for World Map ---
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwylu_1JxOFwI66iI3X0Fc7IQz7PiA5zJKjrjZkvNF1XzPKVzmvLZSHnB-bilwVdawE/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz3HYsPK_9tiDBRy6Iw2d4lXH9h1y0HJ1w3i-Umldh5Jmuz6bEOlB0P6BO17ozgL66p/exec';
 
 async function syncWorldPullFromSheet(showFeedback = true) {
   const statusEl = document.getElementById('sync-status');
@@ -1177,7 +1177,11 @@ async function syncWorldPushToSheet() {
     if (statusEl) {
       statusEl.style.display = 'block';
       statusEl.style.color = '#dc2626';
-      statusEl.textContent = '❌ 저장 실패: 잠시 후 다시 시도해 주세요.';
+      // 서버(Apps Script)가 돌려준 구체적인 사유가 있으면 그대로 보여 준다
+      const reason = (err && err.message ? String(err.message).trim() : '');
+      statusEl.textContent = reason
+        ? `❌ 저장 실패: ${reason}`
+        : '❌ 저장 실패: 잠시 후 다시 시도해 주세요.';
     }
   }
 }
